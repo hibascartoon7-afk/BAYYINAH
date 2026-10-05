@@ -21,3 +21,17 @@ Thumbs.db
 # Temporary files
 *.tmp
 *.log
+
+# Search index (rebuilt with: python engine.py --rebuild)
+chroma_db/
+
+# ملفات المصادر الخام (كبيرة، والنظيف في data/ يكفي)
+data/raw/
+data/sources/
+books/
+*.htm
+
+# نسخ احتياطية محلية
+backup/
+engine_backup.py
+result.html

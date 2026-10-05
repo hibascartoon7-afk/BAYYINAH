@@ -80,6 +80,10 @@ python engine.py --rebuild
 │   ├── hadith_database.json     الصحيحان بعد التنظيف
 │   ├── rulings_database.json    كتب الأحكام بعد التنظيف
 │   └── log.json                 سجل التنظيف: كل حذف وتعديل وسببه
+├── evaluation/
+│   ├── test_set.csv              مجموعة الاختبار: 34 رسالة، منها 12 حالة رسمية من الحزمة العلمية
+│   ├── run_eval.py               قياس الأداة على مجموعة الاختبار
+│   └── compare_general_model.py  المقارنة بنموذج لغوي عام
 └── docs/
     ├── METHODOLOGY.md   المنهجية العلمية
     ├── ARCHITECTURE.md  البنية التقنية

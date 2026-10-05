@@ -2,3 +2,5 @@ chromadb
 sentence-transformers
 numpy
 streamlit
+google-genai
+python-dotenv

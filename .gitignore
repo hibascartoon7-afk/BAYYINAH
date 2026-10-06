@@ -35,3 +35,8 @@ books/
 backup/
 engine_backup.py
 result.html
+
+# أداة التحديث ونسخها الاحتياطية
+update/
+apply_update.py
+backup_update_*/

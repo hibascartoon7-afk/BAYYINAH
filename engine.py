@@ -388,6 +388,11 @@ def verify(user_text: str, k: int = 3, input_type: str = "text",
     if FATWA.search(normalize(user_text)):
         return {**base, "decision": "fatwa", "message": FATWA_MSG}
 
+    from scope import out_of_scope
+    scope_msg = out_of_scope(user_text, related)
+    if scope_msg:
+        return {**base, "decision": "out_of_scope", "message": scope_msg}
+
     if related:
         return {**base, "decision": "related_only", "related": related,
                 "message": "لم نجد هذا الحديث بلفظه في مصادرنا. وجدنا أحاديث قريبة في المعنى، "

@@ -53,7 +53,7 @@ def ask_model(prompt: str, system: str = SYSTEM_PROMPT) -> str:
 
     client = genai.Client(
         api_key=key,
-        http_options=types.HttpOptions(timeout=10000),   # 8 ثوانٍ لكل محاولة، ثم ننتقل للتالي
+        http_options=types.HttpOptions(timeout=10000),  # 10 ثوانٍ لكل محاولة (أدنى ما تقبله Google)، ثم ننتقل للتالي
     )
     config = types.GenerateContentConfig(
         system_instruction=system,
@@ -121,7 +121,7 @@ def _template(result: dict) -> str:
     if d == "related_only":
         return ("لم نجد هذا النص بلفظه في مصادرنا. وهذه أحاديث قريبة منه في المعنى، "
                 "وهي أحاديث أخرى وليست حكمًا على ما كتبتَه.")
-    if d == "fatwa":
+    if d in ("fatwa", "out_of_scope"):
         return result.get("message", "")
     return "لم نجد هذا النص في مصادرنا المعتمدة. يُرجى مراجعة مختص."
 
@@ -139,7 +139,7 @@ def explain(user_text: str, result: dict) -> dict:
     الواجهة تعرض intro فوق البطاقات، والبطاقات كما هي من المحرك.
     إن كان source == "model" تكتب الواجهة بجانبه: «توضيح آلي — ليس من كلام أهل العلم».
     """
-    if result.get("decision") in ("fatwa", "not_found", "related_only"):
+    if result.get("decision") in ("fatwa", "not_found", "related_only", "out_of_scope"):   # الحالات الحساسة: جملة جاهزة دائمًا
         return {"intro": _template(result), "source": "template"}
 
     cards = result.get("matches") or result.get("related") or []

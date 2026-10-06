@@ -24,6 +24,7 @@ except ImportError:
     pass
 
 import os
+import re
 from html import escape as esc
 
 import streamlit as st
@@ -46,10 +47,10 @@ STAR = ("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='
 # ─────────────────────────── التنسيق ───────────────────────────
 st.markdown(f"""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Reem+Kufi:wght@500;700&family=Amiri:wght@400;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Readex+Pro:wght@400;500;600;700&family=Noto+Naskh+Arabic:wght@400;500;600&family=Amiri:wght@400;700&display=swap');
 
 :root{{
-  --ink:#1b1f4b;      /* حبر نيلي: الهوية */
+  --ink:#161d4a;      /* حبر نيلي: الهوية، كما في العرض والفيديو */
   --ink-2:#2b3170;
   --paper:#f5f6fb;    /* ورق بارد */
   --sheet:#ffffff;
@@ -61,9 +62,9 @@ st.markdown(f"""
   --none:#5b6478;     /* لم يُعثر عليه */
   --fatwa:#6b3fa0;    /* إحالة */
   --alert:#b3261e;    /* جزء فقط */
-  --sans:'IBM Plex Sans Arabic',Tahoma,sans-serif;
-  --kufi:'Reem Kufi','IBM Plex Sans Arabic',sans-serif;
-  --naskh:'Amiri','Traditional Arabic',serif;
+  --sans:'Readex Pro',Tahoma,sans-serif;
+  --kufi:'Readex Pro',Tahoma,sans-serif;
+  --naskh:'Noto Naskh Arabic','Amiri','Traditional Arabic',serif;
 }}
 
 /* إطار Streamlit */
@@ -86,7 +87,7 @@ st.markdown(f"""
   color:#fff !important;text-decoration:none;border:1px solid rgba(255,255,255,.45);border-radius:999px;padding:4px 14px}}
 .lang:hover{{background:rgba(255,255,255,.12)}}
 .lang:focus-visible{{outline:3px solid #8f95e6;outline-offset:2px}}
-.hero .word{{font-family:var(--kufi);font-size:88px;line-height:1;margin:0;font-weight:700;letter-spacing:0}}
+.hero .word{{font-family:var(--naskh);font-size:88px;line-height:1.2;margin:0;font-weight:600;letter-spacing:0;color:#E8C768}}
 .hero .motto{{font-family:var(--naskh);font-size:24px;color:#c9cdf2;margin:14px 0 0}}
 .hero p, .hero .stMarkdown p{{text-align:center !important}}
 .hero .lead{{font-family:var(--sans);font-size:16px;color:#e6e8fb;max-width:520px;margin:18px auto 0;line-height:1.9}}
@@ -125,7 +126,7 @@ st.markdown(f"""
 .verdict h2{{font-family:var(--kufi);font-size:26px;margin:0;color:var(--text);font-weight:700}}
 .verdict p{{margin:6px 0 0;color:var(--mut);font-size:15px;line-height:1.8}}
 .v-found{{color:var(--found)}} .v-near{{color:var(--near)}} .v-none{{color:var(--none)}}
-.v-fatwa{{color:var(--fatwa)}} .v-alert{{color:var(--alert)}}
+.v-fatwa{{color:var(--fatwa)}} .v-alert{{color:var(--alert)}} .v-rul{{color:var(--fatwa)}}
 
 .chain{{display:flex;flex-wrap:wrap;align-items:center;gap:0;margin:14px 0 6px;font-size:14px}}
 .chain span{{background:#fff;border:1px solid var(--line);border-radius:999px;padding:5px 14px;color:var(--text)}}
@@ -185,12 +186,14 @@ details summary{{cursor:pointer;font-size:13px;color:var(--ink);font-family:var(
   .verdict{{gap:12px}} .seal{{width:74px;height:74px;font-size:13px}} .verdict h2{{font-size:21px}}
   .matn{{font-size:22px}} .page{{padding:16px 16px 12px}} .chain i{{width:12px}}
 }}
+[data-testid="stCode"] pre, [data-testid="stCode"] code{{direction:rtl;text-align:right;white-space:pre-wrap !important;
+  word-break:break-word;font-family:var(--sans) !important;font-size:15px;line-height:1.9}}
 </style>
 """, unsafe_allow_html=True)
 
 
 # ─────────────────────────── اللغة ───────────────────────────
-# الواجهة تتحول إلى الإنجليزية؛ أما الأحاديث وأقوال العلماء وأسماء الكتب فتبقى بالعربية كما هي،
+# الواجهة تتحول إلى الإنجليزية؛ أما الأحاديث وأقوال العلماء فتبقى بالعربية كما هي،
 # لأن ترجمتها آليًا تخالف مبدأ «النص يُنقل ولا يُولَّد». والمصطلحات من قاموس الحزمة العلمية.
 LANG = "en" if st.query_params.get("lang") == "en" else "ar"
 EN = LANG == "en"
@@ -204,6 +207,7 @@ if EN:
 [data-testid="stCaptionContainer"], [data-testid="stTabs"] button p, [data-testid="stAlert"] p{text-align:left}
 .stTextArea textarea, .stMarkdown p.matn, .isnad, .seg, .stMarkdown .seg{direction:rtl;text-align:right !important}
 .hero .motto{font-family:var(--sans);font-size:20px}
+.stTextArea textarea::placeholder{unicode-bidi:plaintext;text-align:start;font-family:var(--sans);font-size:15px}
 </style>""", unsafe_allow_html=True)
 
 T = {
@@ -211,7 +215,7 @@ T = {
         "switch": ("English", "?lang=en"), "motto": "لا حكم بلا بيّنة",
         "lead": "الصق الرسالة كما وصلتك، أو ارفع صورتها. نعيد الحديث إلى كتابه، "
                 "وننقل كلام أهل العلم فيه بنصه، أو نخبرك بوضوح أننا لم نجده.",
-        "tab_text": "نص الرسالة", "tab_img": "صورة الرسالة", "box": "الرسالة كما وصلتك",
+        "tab_text": "نص الرسالة", "tab_img": "صورة الرسالة", "box": "الرسالة كما وصلتك", "placeholder": "قال رسول الله ﷺ: «…» انشرها تؤجر",
         "check": "تحقّق من الرسالة", "try": "أو جرّب مثالًا:",
         "ex": ["رسالة واتساب", "حديث مشهور", "سؤال شخصي"],
         "upload": "لقطة شاشة من واتساب، أو بطاقة فيها الحديث",
@@ -223,8 +227,10 @@ T = {
         "empty": "الصق نص الرسالة في المربع أولًا، أو اختر مثالًا.",
         "searching": "نبحث في الكتب الخمسة…", "reading": "نقرأ النص من الصورة…",
         "no_text": "لم نجد نصًا عربيًا في الصورة. جرّب صورة أوضح، أو الصق النص في تبويب «نص الرسالة».",
-        "found": ("ثابت في<br>المصادر", "وجدنا هذا النص في مصادرنا",
+        "found": ("في<br>الصحيحين", "وجدنا هذا النص في الصحيحين",
                   "كل مصدر معروض بنصه وكلام مؤلفه كما هو في الكتاب."),
+        "found_rul": ("في كتب<br>المشتهرات", "وجدنا هذا النص في كتب الأحاديث المشتهرة",
+                      "وهي كتب تجمع ما اشتهر على الألسنة، وفيها الصحيح وغيره؛ فاقرأ كلام العلماء فيه أدناه."),
         "partial": ("جزء<br>فقط", "وجدنا جزءًا من رسالتك فقط", "كل مصدر معروض بنصه وكلام مؤلفه كما هو في الكتاب."),
         "related": ("لم يوجد<br>بلفظه", "لم نجد هذا النص بلفظه",
                     "ما تحته أحاديث أخرى قريبة في المعنى، وليست حكمًا على ما كتبته."),
@@ -236,6 +242,7 @@ T = {
         "you": "رسالتك", "five": "الكتب الخمسة", "no_match": "لا مطابق بلفظه", "no_result": "لا نتيجة",
         "no": "رقم", "p": "ص",
         "img_text": "النص الذي قرأناه من الصورة",
+        "ocr_fail": "تعذّرت قراءة الصورة الآن. جرّب لصق نص الرسالة بدلًا منها.",
         "img_fix": "إن أخطأت القراءة، انسخ النص وصحّحه في تبويب «نص الرسالة».",
         "ai": "توضيح آلي، ليس من كلام أهل العلم", "segment": "الجزء الذي وجدناه من رسالتك",
         "matn": "المتن", "riwaya": "نص الرواية كما في الكتاب", "text_note": "تنبيه على النص:",
@@ -257,7 +264,7 @@ T = {
         "switch": ("العربية", "?lang=ar"), "motto": "No ruling without evidence",
         "lead": "Paste a message as you received it, or upload a screenshot. We trace the hadith back to its book "
                 "and show what scholars said about it in their own words, or tell you plainly that we couldn't find it.",
-        "tab_text": "Message text", "tab_img": "Screenshot", "box": "The message as you received it (Arabic)",
+        "tab_text": "Message text", "tab_img": "Screenshot", "box": "The message as you received it (Arabic)", "placeholder": "Paste the Arabic message exactly as you received it\nقال رسول الله ﷺ: «…» انشرها تؤجر",
         "check": "Check this message", "try": "Or try an example:",
         "ex": ["WhatsApp message", "Well-known hadith", "Personal question"],
         "upload": "A WhatsApp screenshot, or an image card with the hadith",
@@ -269,8 +276,10 @@ T = {
         "empty": "Paste the message text first, or pick an example.",
         "searching": "Searching the five books…", "reading": "Reading the text in the image…",
         "no_text": "We couldn't find Arabic text in this image. Try a clearer one, or paste the text in the Message text tab.",
-        "found": ("Found in<br>sources", "We found this text in our sources",
+        "found": ("In the<br>Sahihayn", "We found this text in the Sahihayn",
                   "Each source is shown with its own text and its author's words, exactly as in the book."),
+        "found_rul": ("Popular<br>sayings", "We found this text in books on popular sayings",
+                      "These books collect sayings that spread widely, authentic and otherwise; read what the scholars said about it below."),
         "partial": ("Partly<br>found", "We found only part of your message",
                     "Each source is shown with its own text and its author's words, exactly as in the book."),
         "related": ("Not found<br>verbatim", "We didn't find this exact text",
@@ -289,6 +298,7 @@ T = {
         "you": "Your message", "five": "The five books", "no_match": "No exact match", "no_result": "No result",
         "no": "No.", "p": "p.",
         "img_text": "Text we read from the image",
+        "ocr_fail": "We couldn't read the image right now. Try pasting the message text instead.",
         "img_fix": "If the reading is wrong, copy the text, fix it, and paste it in the Message text tab.",
         "ai": "", "segment": "The part of your message we found",
         "matn": "Hadith text", "riwaya": "Narration as it appears in the book", "text_note": "Note on this text:",
@@ -310,12 +320,18 @@ T = {
 }[LANG]
 
 BOOKS_EN = {"صحيح البخاري": "Sahih al-Bukhari", "صحيح مسلم": "Sahih Muslim", "كشف الخفاء": "Kashf al-Khafa",
-            "الدرر المنتثرة": "al-Durar al-Muntathira", "الفوائد الموضوعة": "al-Fawa'id al-Mawdu'a"}
+            "الدرر المنتثرة": "al-Durar al-Muntathira", "الفوائد الموضوعة": "al-Fawa'id al-Mawdu'a",
+            "الدرر المنتثرة في الأحاديث المشتهرة": "al-Durar al-Muntathira",
+            "الفوائد الموضوعة في الأحاديث الموضوعة": "al-Fawa'id al-Mawdu'a"}
 SOURCE_EN = {"المصادر الأصلية": "Primary sources", "كتب الأحكام والمشتهرات": "Books on popular sayings",
              "مدقق من أ. فاطمة": "Verified by our reviewer", "التخريج": "Takhrij"}
 
 
+BOOK_EDITION = r"\s*-\s*ت\s+عبد\s+الباقي|\s+ط\s+القدسي"     # «صحيح مسلم - ت عبد الباقي» ← «صحيح مسلم»
+
+
 def book(name: str) -> str:
+    name = re.sub(BOOK_EDITION, "", name or "").strip()
     return BOOKS_EN.get(name, name) if EN else name
 
 
@@ -393,7 +409,7 @@ def page_html(m: dict) -> str:
 
     if not m.get("matn_trusted", True) and m.get("matn_note"):
         h += f'<div class="warn">{T["text_note"]} <span dir="rtl">{esc(m["matn_note"])}</span></div>'
-    if m.get("diff"):
+    if "» بدل «" in (m.get("diff") or ""):
         h += f'<p class="diff">{T["diff"]} <span dir="rtl">{esc(m["diff"])}</span></p>'
 
     if m.get("agreement") in FLAGS:
@@ -406,7 +422,7 @@ def page_html(m: dict) -> str:
         h += f'<div class="hashiya"><p class="h-title">{title}</p>'
         for rl in rulings:
             quote = (rl.get("quote") or rl.get("ruling") or "").lstrip(". ")
-            ref = esc(rl.get("book", "")) + (f"، {esc(rl['location'])}" if rl.get("location") else "")
+            ref = esc(book(rl.get("book", ""))) + (f"، {esc(rl['location'])}" if rl.get("location") else "")
             h += (f'<div class="qawl"><div class="who">{esc(rl.get("scholar", ""))}<small>{ref}</small></div>'
                   f'<blockquote>«{esc(quote)}»</blockquote>')
             if rl.get("quote_truncated"):
@@ -418,7 +434,7 @@ def page_html(m: dict) -> str:
 
     if m.get("isnad"):
         h += f'<details><summary>{T["isnad"]}</summary><div class="isnad">{esc(m["isnad"])}</div></details>'
-    note = engine_note(m.get("note", ""), m.get("book", ""))
+    note = re.sub(BOOK_EDITION, "", engine_note(m.get("note", ""), m.get("book", "")))
     if note:
         h += f'<p class="note">{esc(note)}</p>'
     return h + "</div>"
@@ -460,7 +476,7 @@ def use_example(text: str):
 tab_text, tab_img = st.tabs([T["tab_text"], T["tab_img"]])
 
 with tab_text:
-    st.text_area(T["box"], key="msg", height=130, placeholder="قال رسول الله ﷺ: «…» انشرها تؤجر")
+    st.text_area(T["box"], key="msg", height=130, placeholder=T["placeholder"])
     run_text = st.button(T["check"], type="primary", use_container_width=True)
     st.markdown(f'<p class="try">{T["try"]}</p>', unsafe_allow_html=True)
     cols = st.columns(len(EXAMPLES))
@@ -479,6 +495,7 @@ st.markdown('<div class="trust">' + "".join(f"<span>{x}</span>" for x in T["trus
 
 # ─────────────────────────── التنفيذ ───────────────────────────
 if run_text:
+    st.session_state.pop("result", None)
     text = (st.session_state.get("msg") or "").strip()
     if not text:
         st.warning(T["empty"])
@@ -488,6 +505,7 @@ if run_text:
             st.session_state["result"] = (text, r, explain(text, r))
 
 if run_img and img:
+    st.session_state.pop("result", None)
     from ocr import read_image, OCRError
     text = None
     try:
@@ -495,6 +513,8 @@ if run_img and img:
             text = read_image(img.getvalue(), img.type or "image/png")
     except OCRError as e:
         st.error(str(e))
+    except Exception:
+        st.error(T["ocr_fail"])
     if text == "":
         st.warning(T["no_text"])
     elif text:
@@ -507,10 +527,14 @@ if "result" in st.session_state:
     text, r, ex = st.session_state["result"]
     decision = r.get("decision")
     matches, related = r.get("matches", []), r.get("related", [])[:3]
-    top = matches[0] if matches else {}
+    sah_cards = [m for m in matches if m.get("layer") == "sahihayn"]
+    top = (sah_cards or matches or [{}])[0]       # السلسلة توافق الختم: بطاقة الصحيحين أولًا إن وُجدت
 
     if decision == "found":
-        kind, (seal, title, body) = ("alert", T["partial"]) if r.get("partial") else ("found", T["found"])
+        in_sah = any(m.get("layer") == "sahihayn" for m in matches)
+        kind, (seal, title, body) = (("alert", T["partial"]) if r.get("partial")
+                                     else ("found", T["found"]) if in_sah
+                                     else ("rul", T["found_rul"]))
         steps = [T["you"], book(top.get("book", "")), *([f"{T['no']} {top['number']}"] if top.get("number") else [])]
         st.markdown(verdict_html(kind, seal, title, body) + chain_html([s for s in steps if s]),
                     unsafe_allow_html=True)
@@ -535,7 +559,7 @@ if "result" in st.session_state:
                     unsafe_allow_html=True)
 
     if r.get("input_type") == "image":
-        with st.expander(T["img_text"]):
+        with st.expander(T["img_text"], expanded=True):
             st.markdown(f'<div class="seg">{esc(r.get("extracted_text", ""))}</div>', unsafe_allow_html=True)
             st.caption(T["img_fix"])
 

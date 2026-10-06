@@ -40,3 +40,6 @@ result.html
 update/
 apply_update.py
 backup_update_*/
+
+# مفتاح ستريمليت المحلي: لا يُرفع أبدًا
+.streamlit/secrets.toml

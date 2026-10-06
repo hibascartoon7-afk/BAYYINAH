@@ -1,0 +1,14 @@
+[server]
+# لا مراقبة للملفات: توفّر المعالج على الخادم، وتمنع رسائل الطرفية الحمراء
+fileWatcherType = "none"
+
+[browser]
+gatherUsageStats = false
+
+[theme]
+# المظهر الفاتح دائمًا، ولو كان جهاز المستخدم على الوضع الداكن؛ فالواجهة مصممة للفاتح
+base = "light"
+primaryColor = "#161d4a"
+backgroundColor = "#f5f6fb"
+secondaryBackgroundColor = "#ffffff"
+textColor = "#1f2333"

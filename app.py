@@ -84,6 +84,7 @@ st.markdown(f"""
   padding:56px 20px 92px;text-align:center;color:#fff}}
 .hero .word{{font-family:var(--kufi);font-size:88px;line-height:1;margin:0;font-weight:700;letter-spacing:0}}
 .hero .motto{{font-family:var(--naskh);font-size:24px;color:#c9cdf2;margin:14px 0 0}}
+.hero p, .hero .stMarkdown p{{text-align:center !important}}
 .hero .lead{{font-family:var(--sans);font-size:16px;color:#e6e8fb;max-width:520px;margin:18px auto 0;line-height:1.9}}
 
 /* ورقة الإدخال تعلو الشريط */

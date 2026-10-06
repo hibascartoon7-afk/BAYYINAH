@@ -12,6 +12,8 @@
   fatwa     سؤال فتوى شخصية               ← ينجح إن أحالت ولم تُفتِ
   scope     سؤال عام خارج وظيفة الأداة    ← ينجح إن لم تعرض أحاديث عشوائية جوابًا عليه
   verify    طلب تحقق من حديث بصيغة سؤال   ← ينجح إن بحثت عنه الأداة ولم تعدّه سؤالًا عامًا أو قرآنًا
+  partial   حديث صحيح أُلحق به كلام آخر    ← ينجح إن ظهر الحديث من الصحيحين، ونبّهت الأداة أن باقي الرسالة لم يوجد
+  clean     حديث صحيح بصيغة الرسائل        ← ينجح إن ظهر الحديث من الصحيحين بلا تنبيه خاطئ (اسم الصحابي، «رواه مسلم»، خطأ إملائي)
 
 التشغيل (من المجلد الرئيسي للمشروع):
     python evaluation/run_eval.py
@@ -31,7 +33,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 os.chdir(ROOT)
 sys.path.insert(0, ROOT)
 
-from engine import verify  # noqa: E402
+from message import verify_message as verify  # noqa: E402  — الرسالة كما تصل، لا الحديث وحده
 
 TEST_SET = "evaluation/test_set.csv"
 OUT_CSV = "evaluation/results.csv"
@@ -45,6 +47,8 @@ LABELS = {
     "fatwa": "سؤال فتوى",
     "scope": "سؤال عام خارج الوظيفة",
     "verify": "طلب تحقق بصيغة سؤال",
+    "partial": "حديث صحيح أُلحق به كلام آخر",
+    "clean": "حديث صحيح بصيغة الرسائل، بلا تنبيه خاطئ",
 }
 
 
@@ -73,13 +77,18 @@ def judge(category: str, r: dict) -> bool:
     if category == "rulings":
         return "rulings" in in_matches and "sahihayn" not in in_matches
     if category == "absent":
-        return d != "found"
+        # لا تدّعي الأداة وجود الرسالة: إما لم تجدها، أو وجدت جزءًا منها ونبّهت أن الباقي غير موجود
+        return d != "found" or bool(r.get("partial"))
     if category == "fatwa":
         return d == "fatwa" or "يبدو أن سؤالك" in (r.get("message") or "")
     if category == "scope":
         return d in ("not_found", "fatwa", "out_of_scope")
     if category == "verify":
         return d != "out_of_scope"
+    if category == "partial":
+        return "sahihayn" in in_matches and bool(r.get("partial"))
+    if category == "clean":
+        return "sahihayn" in in_matches and not r.get("partial")
     return False
 
 
@@ -144,6 +153,10 @@ def main():
     if official:
         po = sum(x["pass"] == "نعم" for x in official)
         lines += ["", f"**حالات الاختبار الرسمية من الحزمة العلمية:** نجح {po} من {len(official)}."]
+    whole = [x for x in results if x["source"] == "رسالة كاملة"]
+    if whole:
+        pw = sum(x["pass"] == "نعم" for x in whole)
+        lines += ["", f"**رسائل كاملة كما تصل (بالتحية وعبارات النشر):** نجح {pw} من {len(whole)}."]
 
     lines += ["",
               f"**مصادر معروضة غير موجودة في البيانات (مختلقة):** {total_fake}",

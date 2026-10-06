@@ -141,6 +141,8 @@ def explain(user_text: str, result: dict) -> dict:
     """
     if result.get("decision") in ("fatwa", "not_found", "related_only", "out_of_scope"):   # الحالات الحساسة: جملة جاهزة دائمًا
         return {"intro": _template(result), "source": "template"}
+    if result.get("partial"):   # وُجد جزء من الرسالة فقط (message.py): التنبيه نفسه هو التمهيد
+        return {"intro": result.get("message", ""), "source": "template"}
 
     cards = result.get("matches") or result.get("related") or []
     found = result.get("decision") == "found"

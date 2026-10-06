@@ -105,11 +105,43 @@ def _extra_words(text: str, seg: str) -> list:
     return [w for w in _clean(normalize(text or "")).split() if w not in _FILLER and not _in(w, seg_words)]
 
 
+# كسر التعادل في ترتيب البطاقات، ولا شيء غيره.
+# المحرك يعدّ الكلمة القريبة جدًا مطابقة («سبحانك» ≈ «سبحان»)، فقد تأخذ بطاقةٌ فيها كلمات مستبدلة
+# نسبةَ التطابق نفسها التي تأخذها البطاقة المطابقة حرفيًا، فتظهر قبلها. مثال: «سبحان الله وبحمده»
+# كانت أول بطاقته «سبحانك ربي وبحمدك» (مسلم 484)، وهو ذِكر آخر، قبل «… سبحان الله وبحمده» (مسلم 2731).
+#
+# القاعدة: يبقى ترتيب المحرك كما هو بين البطاقات المختلفة في نسبة التطابق. وبين البطاقات المتساوية فيها
+# (المتجاورة في ترتيب المحرك) يُقدَّم الأقل كلماتٍ مستبدلة، ثم المصدر حسب طبقته، ثم ترتيب المحرك.
+# والكلمات المستبدلة تُعدّ من حقل diff بعدد مرات «» بدل «»؛ أما الناقصة فلا تُعدّ، فنقلُ جزءٍ من الحديث ليس خطأً في اللفظ.
+_LAYER_ORDER = {"verified": 0, "sahihayn": 1, "rulings": 2, "takhreej": 3}
+
+
+def _subs(card: dict) -> int:
+    return (card.get("diff") or "").count("» بدل «")
+
+
+def _order(result: dict) -> dict:
+    cards = result.get("matches") or []
+    if len(cards) < 2:
+        return result
+    out, i = [], 0
+    while i < len(cards):
+        sim = round(cards[i].get("similarity", 0), 4)
+        j = i
+        while j + 1 < len(cards) and round(cards[j + 1].get("similarity", 0), 4) == sim:
+            j += 1
+        tied = sorted(enumerate(cards[i:j + 1]),
+                      key=lambda ic: (_subs(ic[1]), _LAYER_ORDER.get(ic[1].get("layer"), 9), ic[0]))
+        out += [c for _, c in tied]
+        i = j + 1
+    return {**result, "matches": out}
+
+
 def verify_message(text: str, **kwargs) -> dict:
     """مثل verify، لكن للرسالة المنتشرة كما تصل. تضيف حقلين:
     segment: المقطع الذي وُجد فيه الحديث (فارغ إن فُحصت الرسالة كاملة).
     partial: True إن بقي في الرسالة كلام آخر لم نجده؛ والواجهة تعرض message تنبيهًا ظاهرًا."""
-    whole = verify(text, **kwargs)
+    whole = _order(verify(text, **kwargs))
     if whole.get("decision") == "found":
         # الرسالة كلها وُجدت؛ لكن قد يُلحَق بحديث طويل وعدٌ مختلق قصير لا يكفي لإسقاط نسبة التطابق.
         # فنقارن كلمات الرسالة بنص الحديث الذي وُجد نفسه.
@@ -124,7 +156,7 @@ def verify_message(text: str, **kwargs) -> dict:
     for seg in candidates(text):
         if seg == normalize(text):
             continue                                  # فُحص كاملًا من قبل
-        r = verify(seg, **kwargs)
+        r = _order(verify(seg, **kwargs))
         if r.get("decision") == "found":
             found.append((seg, r))
 

@@ -61,22 +61,36 @@ def _sahihayn_part(card: dict) -> list:
     return lines
 
 
+def _quotable(r: dict) -> bool:
+    """كلام العالم يُنقل بنصه فقط إن كان قصيرًا وتامًّا وبلا حاشية محقق."""
+    q = _one_line(r.get("quote", "")).lstrip(". ")
+    return bool(q) and len(q) <= MAX_QUOTE and not r.get("quote_truncated") and not r.get("quote_note")
+
+
 def _ruling_line(card: dict, r: dict) -> str:
     who = r.get("scholar") or "المؤلف"
     book = _book_name(r.get("book") or card.get("book", ""))
     loc = f" ({r['location']})" if r.get("location") else ""
     q = _one_line(r.get("quote", "")).lstrip(". ")
-    complete = q and len(q) <= MAX_QUOTE and not r.get("quote_truncated") and not r.get("quote_note")
-    if complete:
+    if _quotable(r):
         return f"• قال {who} في «{book}»{loc}: «{q}»"
     return f"• ذكره {who} في «{book}»{loc}، فالأولى أن يُقرأ كلامه فيه كاملًا من الكتاب."
 
 
 def _rulings_part(cards: list) -> list:
     lines = ["لم يظهر هذا النص في بحثي في الصحيحين، وهذا ما في كتب أهل العلم عنه:"]
-    for card in cards[:2]:
-        for r in (card.get("rulings") or [])[:1]:
-            lines.append(_ruling_line(card, r))
+    # كتاب واحد لكل سطر، وثلاثة كتب على الأكثر. ويُقدَّم الكلام الذي يُنقل بنصه على الذي يُحال فيه إلى الكتاب،
+    # حتى لا يُزاح قولٌ صريح (مثل كلام ابن تيمية) بسطر «فالأولى أن يُقرأ كاملًا» لأن ترتيب البطاقات تغيّر.
+    picked, seen = [], set()
+    for card in cards:
+        r = (card.get("rulings") or [None])[0]
+        book = _book_name(card.get("book", ""))
+        if r and book not in seen:
+            seen.add(book)
+            picked.append((card, r))
+    picked.sort(key=lambda cr: not _quotable(cr[1]))      # ترتيب ثابت: يبقى ترتيب البطاقات داخل كل مجموعة
+    for card, r in picked[:3]:
+        lines.append(_ruling_line(card, r))
     if len(lines) == 1:            # لا كلام منقول: نذكر الكتاب وحده
         lines.append(f"• ذُكر في {_where(cards[0])}.")
     lines.append("وهذه الكتب تجمع ما اشتهر على الألسنة، وفيها الصحيح وغيره، "
